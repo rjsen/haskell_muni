@@ -1,21 +1,26 @@
 import Text.XML.Light
 import Network.HTTP
 import Network.Mail.Mime
+import qualified Data.ByteString.Lazy.Char8 as B
+import System.Environment
 
-recip = "4082300301@txt.att.net"
-needed = 5
-sid = "16619"
-rt = "L"
+main = do
+  (recip:needstr:sid:rt:extra) <- getArgs
+  --let recip = "rjsen@me.com" --"4082300301@txt.att.net"
+  --let needed = 15
+  --let sid = "16619"
+  --let rt = "L"
+  let needed = read needstr :: Int
 
-msg = "To: " ++ recip ++ "\nThe next " ++ rt ++ " will be at stop " ++ sid ++ " in "
-
-res <- simpleHTTP getRequest("http://webservices.nextbus.com/service/publicXMLFeed?command=predictions&a=sf-muni&stopId=" ++ sid ++ "&routeTag=" ++ rt)
+  res <- simpleHTTP $ getRequest("http://webservices.nextbus.com/service/publicXMLFeed?command=predictions&a=sf-muni&stopId=" ++ sid ++ "&routeTag=" ++ rt)
     
-xml <- getResponseBody res
+  xml <- getResponseBody res
 
-Just doc = parseXMLDoc xml
-Just min = findAttr (QName "minutes" Nothing Nothing ) (head $ findElements (QName "prediction" Nothing Nothing ) doc)
+  let Just min = parseXMLDoc xml >>= \x -> findAttr (QName "minutes" Nothing Nothing ) (head $ findElements (QName "prediction" Nothing Nothing ) x)
+  let minutes = read min :: Int
+  
+  let msg = B.pack $ "To: " ++ recip ++ "\nThe next " ++ rt ++ " will be at stop " ++ sid ++ " in " ++ min ++ " minutes"
 
-checkTime :: (Int a) => Int -> Bool
-checkTime needed = 
-checkTime x = False
+  if needed >= minutes
+     then sendmail msg
+     else return ()
